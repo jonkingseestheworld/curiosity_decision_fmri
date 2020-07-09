@@ -6,9 +6,9 @@ The Markdown file (.rmd) generates the graphs and model summary in a html file f
 The Sigmoid curve (logistic function) models the relationship between the prospective shock probability and participant's risk-take decisions
 ![alt text](shock_effect_sigmoidplot.png)
 
-To see the interactive html outputs, check <a href="https://johnny.kinglau.info/dataviz_examples/" target="_blank"> here </a>
+To see the interactive html outputs, click <a href="https://johnny.kinglau.info/dataviz_examples/" target="_blank"> here </a>.
   
-Remarks:
+###Remarks:
 For the main data repository for this study, please check the corresponding project on OSF: https://osf.io/mafe3/
 
 Neuroimaging data associated with the project: The unthresholded SPM maps can be found under this Neurovault collection https://neurovault.org/collections/AWZZIZCZ/
