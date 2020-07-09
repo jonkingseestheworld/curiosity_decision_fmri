@@ -8,7 +8,8 @@ The Sigmoid curve (logistic function) models the relationship between the prospe
 
 To see the interactive html outputs, click <a href="https://johnny.kinglau.info/dataviz_examples/" target="_blank"> here </a>.
   
-### Remarks:
+  
+#### Remarks:
 For the main data repository for this study, please check the corresponding project on OSF: https://osf.io/mafe3/
 
 Neuroimaging data associated with the project: The unthresholded SPM maps can be found under this Neurovault collection https://neurovault.org/collections/AWZZIZCZ/
