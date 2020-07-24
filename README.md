@@ -10,6 +10,6 @@ To see the interactive html outputs, click <a href="https://johnny.kinglau.info/
   
   
 #### Remarks:
-For the main data repository for this study, please check the corresponding project on OSF: https://osf.io/mafe3/
+For the main data repository of this study, please check the corresponding project on OSF: https://osf.io/mafe3/
 
 Neuroimaging data associated with the project: The unthresholded SPM maps can be found under this Neurovault collection https://neurovault.org/collections/AWZZIZCZ/ .
