@@ -1,7 +1,7 @@
 The codes in this repository (the .rmd Markdown file) were used to create the behavioural graphs in the paper, "Shared striatal activity in decisions to satisfy curiosity and hunger at the risk of electric shocks" (doi: https://doi.org/10.1101/473975), published in Nature Human Behaviour.
 
 The Markdown file (.rmd) generates the graphs and model summary in <a href="https://johnny.kinglau.info/dataviz_examples/" target="_blank"> an interactive html output </a>, for better visualisation. This includes a 'raincloud plot' illustrating the relationship between the level of curiosity/food desirability and participant's risk-take decisions.
-![alt text](curiosity_effect_raincloudplot.png)
+![alt text]<img src="curiosity_effect_raincloudplot.png" width="48"> 
 
 The Sigmoid curve (logistic function) models the relationship between the prospective shock probability and participant's risk-take decisions.
 ![alt text](shock_effect_sigmoidplot.png)
