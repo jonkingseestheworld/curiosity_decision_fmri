@@ -10,13 +10,9 @@ DOI: 10.12688/wellcomeopenres.15191.1
 It can be downloaded here (https://github.com/RainCloudPlots/RainCloudPlots)
 
 ```{r, include=FALSE}
-#{r setup, include=FALSE, cache=TRUE, echo=FALSE}
-
 #remove all existing variables in the environment
 rm(list=ls())
 
-current_dir = "C:/Users/DrJKLau/Desktop/BehData_curi-fmri_osf"
-setwd(current_dir)
 
 ```
 
@@ -27,10 +23,19 @@ Load packages and data
 
 require(pacman)
 
-# Read into the data for analysis
-df <- read.csv(file = 'data1_initial_behav.csv', header=TRUE, sep=",")
-
 knitr::opts_chunk$set(cache=T)
+
+##uncomment this part to use osfr package to get access and download data from OSF
+
+#p_load(osfr)
+#
+#curi_project <- osf_retrieve_node("https://osf.io/mafe3/") # access OSF project
+#
+#osf_retrieve_node("mafe3") %>%
+#  osf_ls_files() %>%
+#  osf_download() # download data to your current directory 
+## to check your current directory, use getwd()
+
 
 # check if a package is installed and then load it
 p_load(ggplot2)
@@ -80,39 +85,56 @@ raincloud_theme <- theme(
 Re-structuring data for plotting
 ```{r data wrangling}
 
-# Using 'aggregate', split data into subsets computing summary statistics for each
+# Read into the data for analysis
+read_csv <- function(df) {
+  read.csv(file = df, header=TRUE, sep=",")}
+
+df <- read_csv('Data files/data1_initial_behav.csv')
+
+
+# Using 'aggregate' function, split data into subsets computing summary statistics for each
   # raw_rate: raw rating of curiosity and desirability for food
   # category: food or magic (or trivia in one of the fMRI experiments)
   # choice/decision:  1 for accepted; 0 for rejected
-agg_ppt_data <- aggregate(raw_rate~participant+category+choice, data=df, FUN=mean)
 
-# re-label choice/decision options
-agg_ppt_data["Decision"] <-NA
-agg_ppt_data$Decision[agg_ppt_data$choice==0] <- "Reject"
-agg_ppt_data$Decision[agg_ppt_data$choice==1] <- "Accept"
+calc_agg_ppt <- function(df){
+  agg_ppt_data <- aggregate(raw_rate~participant+category+choice, data=df, FUN=mean)
 
-
-# compile Mean, SD, & SE of ratings across participants into a DataFrame
-rst_m <- aggregate(raw_rate~category+choice, data=df, FUN=mean)
-names(rst_m)[3]<- "group_mean_rate"
-
-rst_sd <-  aggregate(raw_rate~category+choice, data=df, FUN=sd)  
-names(rst_sd)[3]<- "sd_rate"
-rst <- merge(rst_m, rst_sd, by = c("category", "choice"))
+  # re-label choice/decision options
+  agg_ppt_data["Decision"] <-NA
+  agg_ppt_data$Decision[agg_ppt_data$choice==0] <- "Reject"
+  agg_ppt_data$Decision[agg_ppt_data$choice==1] <- "Accept"
+  
+  return(agg_ppt_data)
+}
 
 
-rst["se_rate"] <- rst$sd_rate/sqrt(length(unique(df$participant)))
+calc_avg_datapoint <- function(df){
+  # compile Mean, SD, & SE of ratings across participants into a DataFrame
+  avg_data_m <- aggregate(raw_rate~category+choice, data=df, FUN=mean)
+  names(avg_data_m)[3]<- "group_mean_rate"
 
-# re-label choice/decision options
-rst["Decision"] <-NA
-rst$Decision[rst$choice==0] <- "Reject"
-rst$Decision[rst$choice==1] <- "Accept"
+  avg_data_sd <-  aggregate(raw_rate~category+choice, data=df, FUN=sd)  
+  names(avg_data_sd)[3]<- "sd_rate"
+  avg_data <- merge(avg_data_m, avg_data_sd, by = c("category", "choice"))
+  
+  
+  avg_data["se_rate"] <- avg_data$sd_rate/sqrt(length(unique(df$participant)))
+  
+  # re-label choice/decision options
+  avg_data["Decision"] <-NA
+  avg_data$Decision[avg_data$choice==0] <- "Reject"
+  avg_data$Decision[avg_data$choice==1] <- "Accept"
+  
+  # also compute the ymin and ymax of the error bars using SE of ratings
+  avg_data$ymin = with(avg_data, group_mean_rate - se_rate)
+  avg_data$ymax = with(avg_data, group_mean_rate + se_rate)
+  
+  return(avg_data)
+}
 
-# also compute the ymin and ymax of the error bars using SE of ratings
-rst$ymin = with(rst, group_mean_rate - se_rate)
-rst$ymax = with(rst, group_mean_rate + se_rate)
-
-
+agg_ppt_data = calc_agg_ppt(df)
+avg_data = calc_avg_datapoint(df)
 
 
 ```
@@ -120,22 +142,28 @@ rst$ymax = with(rst, group_mean_rate + se_rate)
 ### Plotting  {.active}
 ```{r, message=FALSE}
 
-#use ggplot and R_rainclouds.script (esp 'geom_flat_violin' function) for plotting
-g_cloudplot <- ggplot() + 
-  geom_flat_violin(data = agg_ppt_data, aes(y = raw_rate, x = category, fill=Decision), position = position_nudge(x = .2, y = 0), alpha = .6, colour=FALSE, show.legend = FALSE) +
-  # add data-points (average ppt rating of each participant)
-  geom_point(data=agg_ppt_data, aes(y = raw_rate, x = category, color = Decision), position = position_jitter(width=.1),size = 1.5, alpha = 0.8, show.legend = FALSE, shape=16) +
-  # add the summary scores (average rating across participants for each condition )
-  geom_pointrange (data=rst, aes(y = group_mean_rate, x = category, ymin= ymin, ymax= ymax, color=Decision), shape=16, size=1.2, position = position_dodge(width=0.1)) + 
+raincloudplot <- function(ppt_data, avg_data){
+  #use ggplot and R_rainclouds.script (esp 'geom_flat_violin' function) for   plotting
+  ggplot() + 
+    geom_flat_violin(data = ppt_data, aes(y = raw_rate, x = category,   fill=Decision), position = position_nudge(x = .2, y = 0), alpha = .6,   colour=FALSE, show.legend = FALSE) +
+    # add data-points (average ppt rating of each participant)
+    geom_point(data= ppt_data, aes(y = raw_rate, x = category, color =   Decision), position = position_jitter(width=.1),size = 1.5, alpha = 0.8,   show.legend = FALSE, shape=16) +
+    # add the summary scores (average rating across participants for each condition   )
+    geom_pointrange (data=avg_data, aes(y = group_mean_rate, x = category, ymin=   ymin, ymax= ymax, color=Decision), shape=16, size=1.2, position =   position_dodge(width=0.1)) + 
+    
+    # adjust other plot features
+    raincloud_theme + 
+    scale_x_discrete(labels=c("Curiosity","Food Desirability")) +
+    ylim(0,7) +
+    labs(fill = "Decision") +
+    scale_y_continuous(name="Stimulus Rating")
   
-  # adjust other plot features
-  raincloud_theme + 
-  scale_x_discrete(labels=c("Curiosity","Food Desirability")) +
-  ylim(0,7) +
-  labs(fill = "Decision") +
-  scale_y_continuous(name="Acceptance Rate")
+}
 
-g_cloudplot
+
+g_rcp <- raincloudplot(agg_ppt_data, avg_data)
+
+g_rcp
 
 # Try the following line to save the plot as an image
 #ggsave("RCP_initialbeh.jpeg", width = 140, height = 180, units = "mm", dpi=300, limitsize=FALSE)
@@ -149,44 +177,47 @@ g_cloudplot
 Some data re-coding & (Generalised) Linear Mixed-effects Modelling 
 ```{r preparation & GLMM}
 
-#ctrd_prob <- -(df$re_prob)
+glm_curi <- function(df){
+  #modelling the curiosity trials separately
+  df_curi <- subset(df, category=="curiosity")
+  
+  ctrd_prob <- -(df_curi$re_prob) #recode the presented (win/loss) outcome   probability so that it reflects the prospective chance of shock
+  
+  glmm_curi<- glmer(choice ~ ctrd_prob*ctrd_rate
+          + (1 | participant) + (-1 + ctrd_rate| participant) 
+          + (-1 + ctrd_prob| participant), 
+          data = df_curi, family = binomial (link= "logit"))
+  curi_summary <- summary(glmm_curi)
+  
+  
+  tab_model(glmm_curi, string.est="Estimate", transform=NULL, show.stat=TRUE, show.se=TRUE, show.df=TRUE)
+ 
+  return(curi_summary)
+}
 
-#effect coding of the Category variable
-df$cond <- (as.numeric(df$category == "curiosity") - 0.5)*2
-
-
-
-#modelling the curiosity trials separately
-df_curi <- subset(df, category=="curiosity")
-
-ctrd_prob <- -(df_curi$re_prob) #recode the presented (win/loss) outcome probability so that it reflects the prospective chance of shock
-
-glmm_curi<- glmer(choice ~ ctrd_prob*ctrd_rate
-        + (1 | participant) + (-1 + ctrd_rate| participant) 
-        + (-1 + ctrd_prob| participant), 
-        data = df_curi, family = binomial (link= "logit"))
-curi_summary <- summary(glmm_curi)
-
-#curi_summary
-
-tab_model(glmm_curi, string.est="Estimate", transform=NULL, show.stat=TRUE, show.se=TRUE, show.df=TRUE)
+curi_summary <- glm_curi(df)
 
 
 
-#modelling the food trials separately
-df_food <- subset(df, category=="food")
+glm_food <- function(df){
+  #modelling the food trials separately
+  df_food <- subset(df, category=="food")
+  
+  ctrd_prob <- -(df_food$re_prob) #recode the presented (win/loss) outcome   probability so that it reflects the prospective chance of shock
+  
+  glmm_food<- glmer(choice ~ ctrd_prob*ctrd_rate
+                    + (1 | participant) + (-1 + ctrd_rate| participant) 
+                    + (-1 + ctrd_prob| participant),
+                   data = df_food, family = binomial (link= "logit"))
+  food_summary <- summary(glmm_food)
+  
+  tab_model(glmm_food, string.est="Estimate", transform=NULL, show.stat=TRUE, show.se=TRUE, show.df=TRUE)
+  
+  return(food_summary)
+}
 
-ctrd_prob <- -(df_food$re_prob) #recode the presented (win/loss) outcome probability so that it reflects the prospective chance of shock
+food_summary <- glm_food(df)
 
-glmm_food<- glmer(choice ~ ctrd_prob*ctrd_rate
-                  + (1 | participant) + (-1 + ctrd_rate| participant) 
-                  + (-1 + ctrd_prob| participant),
-                 data = df_food, family = binomial (link= "logit"))
-food_summary <- summary(glmm_food)
-
-#food_summary
-
-tab_model(glmm_food, string.est="Estimate", transform=NULL, show.stat=TRUE, show.se=TRUE, show.df=TRUE)
 
 ```
 
@@ -195,67 +226,88 @@ tab_model(glmm_food, string.est="Estimate", transform=NULL, show.stat=TRUE, show
 Preparing modelled data for plotting logistic function
 ```{r modelled data & wrangling}
 
-
+dp_modelled <- function(curi_summary, food_summary){
 #Generate a series of continuous x-variable (for plotting later)
-x <- seq(-5,5,length.out=100)
+  x <- seq(-5,5,length.out=100)
+  
+  ##To retrieve Estimates (beta coefficients) of various variables from GLMM model   for data modelling
+  #Information trials
+  cintercept <- curi_summary$coefficients["(Intercept)", "Estimate"]
+  cbeta_prob <-  curi_summary$coefficients["ctrd_prob", "Estimate"]
+  cbeta_rate <- curi_summary$coefficients["ctrd_rate", "Estimate"]
+  
+  #the modelled y-cooridinate data computed with GLMM model coefficients
+  y_cmean <- 1/(1+exp(-1*(cintercept + cbeta_prob*x)))
+  
+  ##To retrieve Estimates (beta coefficients) of various variables from GLMM model   for data modelling
+  #Food trials
+  fintercept <- food_summary$coefficients["(Intercept)", "Estimate"]
+  fbeta_prob <- food_summary$coefficients["ctrd_prob", "Estimate"]
+  fbeta_rate <- food_summary$coefficients["ctrd_rate", "Estimate"]
+  
+  #the modelled y-cooridinate data computed with GLMM model coefficients
+  y_fmean <- 1/(1+exp(-1*(fintercept + fbeta_prob*x)))
+  
+  
+  #compile all (modelled) datapoints into a DataFrame for plotting with ggplot
+  df_plotdata <- data.frame(x_var=x, y_cmean=y_cmean, y_fmean=y_fmean)
+  
+  df_plotdata
+}
 
 
-##To retrieve Estimates (beta coefficients) of various variables from GLMM model for data modelling
-#Information trials
-cintercept <- curi_summary$coefficients["(Intercept)", "Estimate"]
-cbeta_prob <-  curi_summary$coefficients["ctrd_prob", "Estimate"]
-cbeta_rate <- curi_summary$coefficients["ctrd_rate", "Estimate"]
-
-#the modelled y-cooridinate data computed with GLMM model coefficients
-y_cmean <- 1/(1+exp(-1*(cintercept + cbeta_prob*x)))
-
-##To retrieve Estimates (beta coefficients) of various variables from GLMM model for data modelling
-#Food trials
-fintercept <- food_summary$coefficients["(Intercept)", "Estimate"]
-fbeta_prob <- food_summary$coefficients["ctrd_prob", "Estimate"]
-fbeta_rate <- food_summary$coefficients["ctrd_rate", "Estimate"]
-
-#the modelled y-cooridinate data computed with GLMM model coefficients
-y_fmean <- 1/(1+exp(-1*(fintercept + fbeta_prob*x)))
-
-
-#compile all (modelled) datapoints into a DataFrame for plotting with ggplot
-df_plot <- data.frame(x_var=x, y_cmean=y_cmean, y_fmean=y_fmean)
+df_plotdata <- dp_modelled(curi_summary, food_summary)
 
 
 
 ##additional data re-structuring: for plotting distribution of participants' raw data in the same graph
 
-#to summarise data so that (for each subject) the average acceptance rate is computed at each (shock) probability level
-food_selcols <- data.frame(df_food$participant, df_food$re_prob, df_food$choice) 
-names(food_selcols)[c(1,2,3)] <- c("participant","re_prob","choice")
+ppt_foodprob_data <- function(df){
+  #to summarise data so that (for each subject) the average acceptance rate is computed at each (shock) probability level
+  df_food <- subset(df, category=="food")
+  
+  food_selcols <- data.frame(df_food$participant, df_food$re_prob, df_food$choice) 
+  names(food_selcols)[c(1,2,3)] <- c("participant","re_prob","choice")
+  
+  ##recoding reward outcome probability to shock probability 
+  food_selcols["ShockProb"] <- NA
+  food_selcols$ShockProb[food_selcols$re_prob== -2] <- 4
+  food_selcols$ShockProb[food_selcols$re_prob== -1] <- 2
+  food_selcols$ShockProb[food_selcols$re_prob== 0] <- 0
+  food_selcols$ShockProb[food_selcols$re_prob== 1] <- -2
+  food_selcols$ShockProb[food_selcols$re_prob== 2] <- -4
+  
+  efg<- aggregate(choice~participant+ShockProb, data=food_selcols, FUN=function(x) avg_accept=mean(x))
+  names(efg)[3]<-"avg_ppt_choice"
+  
+  efg
+}
+  
 
-##recoding reward outcome probability to shock probability 
-food_selcols["ShockProb"] <- NA
-food_selcols$ShockProb[food_selcols$re_prob== -2] <- 4
-food_selcols$ShockProb[food_selcols$re_prob== -1] <- 2
-food_selcols$ShockProb[food_selcols$re_prob== 0] <- 0
-food_selcols$ShockProb[food_selcols$re_prob== 1] <- -2
-food_selcols$ShockProb[food_selcols$re_prob== 2] <- -4
+ppt_curiprob_data <- function(df){
+  #to summarise data so that (for each subject) the average acceptance rate is computed at each (shock) probability level
+  df_curi <- subset(df, category=="curiosity")
+  
+  cur_selcols <- data.frame(df_curi$participant, df_curi$re_prob, df_curi$choice) 
+  names(cur_selcols)[c(1,2,3)] <- c("participant","re_prob","choice")
+  
+  
+  ##recoding reward outcome probability to shock probability 
+  cur_selcols["ShockProb"] <- NA
+  cur_selcols$ShockProb[cur_selcols$re_prob== -2] <- 4
+  cur_selcols$ShockProb[cur_selcols$re_prob== -1] <- 2
+  cur_selcols$ShockProb[cur_selcols$re_prob== 0] <- 0
+  cur_selcols$ShockProb[cur_selcols$re_prob== 1] <- -2
+  cur_selcols$ShockProb[cur_selcols$re_prob== 2] <- -4
+  abc<- aggregate(choice~participant+ShockProb, data=cur_selcols, FUN=function(x) avg_accept=mean(x))
+  names(abc)[3]<-"avg_ppt_choice"
+  
+  abc
+}
 
-efg<- aggregate(choice~participant+ShockProb, data=food_selcols, FUN=function(x) avg_accept=mean(x))
-names(efg)[3]<-"avg_ppt_choice"
 
-
-#to summarise data so that (for each subject) the average acceptance rate is computed at each (shock) probability level
-cur_selcols <- data.frame(df_curi$participant, df_curi$re_prob, df_curi$choice) 
-names(cur_selcols)[c(1,2,3)] <- c("participant","re_prob","choice")
-
-
-##recoding reward outcome probability to shock probability 
-cur_selcols["ShockProb"] <- NA
-cur_selcols$ShockProb[cur_selcols$re_prob== -2] <- 4
-cur_selcols$ShockProb[cur_selcols$re_prob== -1] <- 2
-cur_selcols$ShockProb[cur_selcols$re_prob== 0] <- 0
-cur_selcols$ShockProb[cur_selcols$re_prob== 1] <- -2
-cur_selcols$ShockProb[cur_selcols$re_prob== 2] <- -4
-abc<- aggregate(choice~participant+ShockProb, data=cur_selcols, FUN=function(x) avg_accept=mean(x))
-names(abc)[3]<-"avg_ppt_choice"
+avg_ppt_foodprob <- ppt_foodprob_data(df)
+avg_ppt_curiprob <- ppt_curiprob_data(df)
 
 
 ```
@@ -264,29 +316,33 @@ names(abc)[3]<-"avg_ppt_choice"
 ### Plotting 
 ```{r logistic plotting}
 
-# plot the modelled curves (separately for curiosity condition and food condition)
-sigplot<- ggplot(data=df_plot, aes(x=x_var)) + 
-  geom_line(aes(y=y_cmean, color='curiosity'), size=1, linetype="solid")  +
-    geom_line(aes(y=y_fmean, color='food'), size=1, linetype="solid") +
-  scale_color_manual(name="Category", values= c(food = "red", curiosity = "blue"))
+sigmoidplot <- function(df_plotdata, ppt_foodprob_data, ppt_curiprob_data){
+  # plot the modelled curves (separately for curiosity condition and food   condition)
+  sigplot<- ggplot(data=df_plotdata, aes(x=x_var)) + 
+    geom_line(aes(y=y_cmean, color='curiosity'), size=1, linetype="solid")  +
+      geom_line(aes(y=y_fmean, color='food'), size=1, linetype="solid") +
+    scale_color_manual(name="Category", values= c(food = "red", curiosity =   "blue"))
+    
+  # add and adjust graph elements
+  axis.title.bold <- element_text(face="bold", size="12", color="black")
+  axis.text.bold <- element_text(face="bold", size="12", color="black")
   
-# add and adjust graph elements
-axis.title.bold <- element_text(face="bold", size="12", color="black")
-axis.text.bold <- element_text(face="bold", size="12", color="black")
-
-sigplot <- sigplot + scale_x_continuous(name="Probability of Shock (%)", breaks=c(-4,-2,0,2,4), labels=c("-4"="16.7%", "-2"="33.3%", "0"="50%", "2"="66.7%", "4"="83.3%")) + 
-  scale_y_continuous(name="Acceptance Rate", breaks=c(0, 0.5, 1)) +
-  ggtitle("Effect of Prospective Shock Probability on 'Accept' Decision") +
-  theme_classic() +
-  theme(axis.title=axis.title.bold, axis.text =axis.text.bold) #plot.title = title.align, 
-
-
-# also plot the raw data-points (from each participant at each probabilty level) on the graph
-sigplot <- sigplot + geom_point(data = efg, mapping = aes(x = ShockProb, y = avg_ppt_choice), shape=1, position=position_jitter(h=0.03,w=0.18), color="blue") +
-  geom_point(data = abc, mapping = aes(x = ShockProb, y = avg_ppt_choice), shape=1, position=position_jitter(h=0.03,w=0.18), color="red")
-
-
+  sigplot <- sigplot + scale_x_continuous(name="Probability of Shock (%)",   breaks=c(-4,-2,0,2,4), labels=c("-4"="16.7%", "-2"="33.3%", "0"="50%",   "2"="66.7%", "4"="83.3%")) + 
+    scale_y_continuous(name="Acceptance Rate", breaks=c(0, 0.5, 1)) +
+    ggtitle("Relationship between Prospective Shock Probability and Gamble Decision") +
+    theme_classic() +
+    theme(axis.title=axis.title.bold, axis.text =axis.text.bold) +
+  
+  
+  # also plot the raw data-points (from each participant at each probabilty level)   on the graph
+    geom_point(data = ppt_foodprob_data, mapping = aes(x =   ShockProb, y = avg_ppt_choice), shape=1, position=position_jitter(h=0.03,w=0.18),   color="blue") +
+    geom_point(data = ppt_curiprob_data, mapping = aes(x = ShockProb, y =   avg_ppt_choice), shape=1, position=position_jitter(h=0.03,w=0.18), color="red")
 
 sigplot
+}
+
+g_sp <- sigmoidplot(df_plotdata, avg_ppt_foodprob, avg_ppt_curiprob)
+
+g_sp
 
 ```
