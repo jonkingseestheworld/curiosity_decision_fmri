@@ -12,5 +12,9 @@ I have also created an ShinyApp (<a href="https://johnnykl-rshiny.shinyapps.io/c
   
 #### Remarks:
 For the main data repository of this study, please check the corresponding project on OSF: https://osf.io/mafe3/
-
 Neuroimaging data associated with the project: The unthresholded SPM maps can be found under this Neurovault collection https://neurovault.org/collections/AWZZIZCZ/ .
+
+#### The raincloud-plot was created by these guys. Check them out!
+Allen M, Poggiali D, Whitaker K et al. Raincloud plots: a multi-platform tool for robust data visualization [version 1; peer review: 2 approved]. Wellcome Open Res 2019, 4:63. DOI: 10.12688/wellcomeopenres.15191.1
+
+Allen M, Poggiali D, Whitaker K, Marshall TR, Kievit R. (2018) RainCloudPlots tutorials and codebase (Version v1.1). Zenodo. http://doi.org/10.5281/zenodo.3368186
